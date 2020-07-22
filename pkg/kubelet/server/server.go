@@ -877,7 +877,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	//     host == hostname of the Kubernetes API server obtained from `kubectl -v 8 get pods`
 	// If attacing the Kubernetes API Server
 	//     host == hostname of the Node the Victim container is running on
-	host := "internal-api-app-25-prod-k8s-local-123456-123456789.us-west-2.elb.amazonaws.com"
+	host := "internal-api-app-25-123456-123456789.us-west-2.elb.amazonaws.com"
 	namespace := "default"
 	pod := "victim-675759495f-pmfbk"
 	container := "victim"
