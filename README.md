@@ -1,8 +1,18 @@
 # Kubernetes CVE-2020-8559 Proof of Concept PoC
 
+__This is for demonstration purposes only. Only for use on systems you are authorized to preform administrative actions on and are authorized to exploit CVE-2020-8559 on__
+
 This is a PoC for CVE-2020-8559 This vulnerability allows an attacker who has gotten `root` on a Node to execute commands on any other Container in the cluster allowing the attacker to take over the Kubernetes Master Node.
 
-This vulnerability results in the fact that the Kubernetes API Server and kubectl command will follow HTTP Redirects combined with the fact that the Kubernetes API just puts all of the components of an API request into the URL i.e. Node name, Pod name, Container name, and even the Command. Therefor, if the Kubelet process responds to `/exec`, `/attach`, `/portforward`, or any `resource: proxy` action with a HTTP 302 Redirect with a Location header which says to execute a different command on a different Node in a different Container the Kubernetes API Server or `kubectl` command will happily make a new request for whatever is in the Location header.
+This vulnerability is due to the fact that the Kubernetes API Server and kubectl command will follow HTTP Redirects combined with the fact that the Kubernetes API just puts all of the components of an API request into the URL i.e. Node name, Pod name, Container name, and even the Command. Therefor, if the Kubelet process responds to `/exec`, `/attach`, `/portforward`, or any `resource: proxy` action with a HTTP 302 Redirect with a Location header which says to execute a different command on a different Node in a different Container the Kubernetes API Server or `kubectl` command will happily make a new request for whatever is in the Location header.
+
+## Kubernetes Repo with my PoC Code
+
+You can download my forked version of Kubernetes and switch to my branch to build the exploit `kubelet` binary
+
+```
+git clone -b CVE-2020-8559 --single-branch git@github.com:tdwyer/kubernetes.git
+```
 
 ## Git diff
 
